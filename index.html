@@ -1,0 +1,323 @@
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title>dc.js - data grid example</title>
+<link rel="stylesheet" type="text/css" href="../css/dc.css"/>
+</head>
+<body>
+
+<script type="text/javascript" src="../js/d3.js"></script>
+<script type="text/javascript" src="../js/crossfilter.js"></script>
+<script type="text/javascript" src="../js/dc.js"></script>
+
+<script type="text/javascript" src="http://underscorejs.org/underscore-min.js"></script>
+<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/jquery.lazyload/1.9.1/jquery.lazyload.min.js"></script>
+
+<script>
+
+var tpl = _.template("<a href='<%= link %>' target='_blank'><h2 title='<%= productname %> in <%= subreddit %>. Click for details'> <%= productname %></h2><img class='lazy-load' dsrc='blank.gif' data-original='<%= mediumimage %>' alt='<%= productname %> member of <%= subreddit %>' title='MEP from <%= subreddit %> in <%= subreddit %>' width=auto height=auto /></a>");
+
+function grid (selector,data) {
+  var ndx = crossfilter(data),
+      all = ndx.groupAll();
+
+
+
+  var pie_group = dc.selectMenu(selector +  " .group");
+  var group = ndx.dimension(function(d) {
+      if (typeof d.subreddit == "undefined") return "";
+      return d.subreddit;
+      });
+  var groupGroup   = group.group().reduceSum(function(d) {   return 1; });
+
+  //var chart_age = dc.barChart(selector + " .age");
+  //var chart_price = dc.lineChart(selector + " .price");
+
+
+    //.x(d3.scale.ordinal())
+	
+  runDimension = ndx.dimension(function(d) {return [+d.subreddit, +d.sum_score]; });
+  runGroup = runDimension.group().reduceSum(function(d) { return +d.count1; });
+  
+
+ 
+      var yearlyDimension = ndx.dimension(function (d) {
+        return d.productname;
+    });
+	
+	
+    // Maintain running tallies by year as filters are applied or removed
+    var yearlyPerformanceGroup = yearlyDimension.group().reduce(
+        /* callback for when data is added to the current filter results */
+        function (p, v) {
+            ++p.count;
+            p.absGain += v.sum_score / 2;
+            p.percentageGain += v.count1 /2;
+            return p;
+        },
+        /* callback for when data is removed from the current filter results */
+        function (p, v) {
+            --p.count;
+            p.absGain -= v.sum_score / 2;
+            p.percentageGain -= v.count1 /2;
+            return p;
+        },
+        /* initialize p */
+        function () {
+            return {
+                count: 0,
+                absGain: 0,
+                percentageGain: 0
+            };
+        }
+    );
+	
+  var yearlyBubbleChart = dc.bubbleChart(selector + " .price");
+      yearlyBubbleChart /* dc.bubbleChart('#yearly-bubble-chart', 'chartGroup') */
+        // (_optional_) define chart width, `default = 200`
+        .width(990)
+        // (_optional_) define chart height, `default = 200`
+        .height(550)
+        // (_optional_) define chart transition duration, `default = 750`
+        .transitionDuration(1500)
+        .margins({top: 10, right: 50, bottom: 30, left: 40})
+        .dimension(yearlyDimension)
+        //The bubble chart expects the groups are reduced to multiple values which are used
+        //to generate x, y, and radius for each key (bubble) in the group
+        .group(yearlyPerformanceGroup)
+        // (_optional_) define color function or array for bubbles: [ColorBrewer](http://colorbrewer2.org/)
+//        .colors(colorbrewer.RdYlGn[9])
+        //(optional) define color domain to match your data domain if you want to bind data or color
+//        .colorDomain([-500, 500])
+    //##### Accessors
+
+        // Accessor functions are applied to each value returned by the grouping
+
+        // `.colorAccessor` - the returned value will be passed to the `.colors()` scale to determine a fill color
+        .colorAccessor(function (p) {
+            return p.value.absGain;
+        })
+        // `.keyAccessor` - the `X` value will be passed to the `.x()` scale to determine pixel location
+        .keyAccessor(function (p) {
+            return p.value.absGain;
+        })
+        // `.valueAccessor` - the `Y` value will be passed to the `.y()` scale to determine pixel location
+        .valueAccessor(function (p) {
+            return p.value.percentageGain;
+        })
+        // `.radiusValueAccessor` - the value will be passed to the `.r()` scale to determine radius size;
+        //   by default this maps linearly to [0,100]
+        .radiusValueAccessor(function (p) {
+            return p.value.count;
+        })
+        .maxBubbleRelativeSize(0.3)
+        .x(d3.scale.linear().domain([-500, 200]))
+        .y(d3.scale.linear().domain([-100, 100]))
+        .r(d3.scale.linear().domain([0, 50]))
+        //##### Elastic Scaling
+
+        //`.elasticY` and `.elasticX` determine whether the chart should rescale each axis to fit the data.
+        .elasticY(true)
+        .elasticX(true)
+        //`.yAxisPadding` and `.xAxisPadding` add padding to data above and below their max values in the same unit
+        //domains as the Accessors.
+        .yAxisPadding(10)
+        .xAxisPadding(70)
+        // (_optional_) render horizontal grid lines, `default=false`
+        .renderHorizontalGridLines(true)
+        // (_optional_) render vertical grid lines, `default=false`
+        .renderVerticalGridLines(true)
+        // (_optional_) render an axis label below the x axis
+        .xAxisLabel('Index Gainx')
+        // (_optional_) render a vertical axis lable left of the y axis
+        .yAxisLabel('Index Gainy')
+        //##### Labels and  Titles
+
+        //Labels are displayed on the chart for each bubble. Titles displayed on mouseover.
+        // (_optional_) whether chart should render labels, `default = true`
+        .renderLabel(true)
+        .label(function (p) {
+            return p.key.substring(0,15);
+        })
+        // (_optional_) whether chart should render titles, `default = false`
+        .renderTitle(true)
+        .title(function (p) {
+            return [
+                p.key,
+                'Upvotes: ' + p.value.absGain,
+                '# of links: ' + p.value.count1
+            ].join('\n');
+        })
+		.yAxis().tickFormat(function (v) {
+            return v;
+        })
+		
+		;
+        //#### Customize Axes
+		
+		
+        // Set a custom tick format. Both `.yAxis()` and `.xAxis()` return an axis object,
+        // so any additional method chaining applies to the axis, not the chart.
+        
+
+  var pie_gilded1 = dc.pieChart(selector +  " .gilded1").radius(70);
+  var gilded1 = ndx.dimension(function(d) {
+      if (typeof d.gilded1 == "undefined") return "";
+      return d.gilded1;
+      });
+
+  var groupgilded1   = gilded1.group().reduceSum(function(d) {   return 1; });
+
+  var bar_subreddit = dc.barChart(selector + " .subreddit");
+  var subreddit = ndx.dimension(function(d) {
+      if (typeof d.subreddit == "undefined") return "";
+      return d.subreddit;
+      });
+  var subredditGroup   = subreddit.group().reduceSum(function(d) { return 1; });
+
+  var Namegilded1= {"1":"Gilded","0":"Regular","":"missing data"};
+  var Symbolgilded1= {"1":"\u2642","F":"\u2640","":""};
+
+  pie_gilded1
+    .width(200)
+    .height(200)
+    .dimension(gilded1)
+    .label(function (d){
+       return Symbolgilded1[d.key];
+    })
+    .title(function (d){
+       return Namegilded1[d.key] +": "+d.value;
+    })
+    .group(groupgilded1);
+
+  pie_group
+    .dimension(group)
+    .group(groupGroup);
+
+  bar_subreddit
+    .width(444)
+    .height(200)
+    .outerPadding(0)
+    .gap(1)
+    .margins({top: 0, right: 0, bottom: 95, left: 30})
+    .x(d3.scale.ordinal())
+    .xUnits(dc.units.ordinal)
+    .brushOn(false)
+    .elasticY(true)
+    .yAxisLabel("#MEPs")
+    .dimension(subreddit)
+    .group(subredditGroup);
+
+  bar_subreddit.on("postRender", function(c) {rotateBarChartLabels();} );
+
+
+  function rotateBarChartLabels() {
+    d3.selectAll(selector+ ' .subreddit .axis.x text')
+      .style("text-anchor", "end" )
+      .attr("transform", function(d) { return "rotate(-90, -4, 9) "; });
+  }
+
+  dc.dataCount(".dc-data-count")
+    .dimension(ndx)
+    .group(all);
+
+  dc.dataGrid(".dc-data-grid")
+    .dimension(subreddit)
+    .group(function (d) {
+        return d.subreddit;
+        })
+  .size(10)
+    .html (function(d) { return tpl(d);})
+    .sortBy(function (d) {
+        return d.sum_score;
+        })
+  .order(d3.ascending)
+  .on('renderlet', function (grid) {
+        $("img.lazy-load").lazyload ({
+effect : "fadeIn"
+})
+        .removeClass("lazy-load");
+        });
+dc.renderAll();
+}
+
+</script>
+
+<h1 class="page-header">Most recommended notebook related products on Reddit</h1>
+<p><b>Click on the graphs to filter products by subreddit,price or gold count</b></p>
+
+
+<div id="ep2014list">
+<div class="price"></div>
+<div class="group"></div>
+<div class="subreddit"></div>
+<div class="gilded1"></div>
+<div class="list"></div>
+<div style="clear:both;">
+<div class="dc-data-count">
+<span class="filter-count"></span> selected out of <span class="total-count"></span> MEPs | <a
+href="javascript:dc.filterAll(); dc.renderAll();">Reset All</a>
+</div>
+</div>
+<div class="dc-data-grid">
+</div>
+
+</div>
+
+<script>
+$(function() {
+    d3.csv("amazonExport2edited.csv", function(d) {return d;}
+      ,function(error, rows) {
+      grid ("#ep2014list",rows);
+      });      
+    });      
+</script>
+
+<style>
+
+#ep2014list table, .dc-data-grid {clear:both;}
+.dc-table-label {background: #F5F5F5; font-weight:bold; }
+.x line {stroke:none;}
+
+body {font-family: arial, helvetica, sans-serif;}
+
+.dc-data-grid, .dc-grid-group {clear:both}
+.dc-data-count {clear:both;}
+.dc-grid-group {
+  background-color: #F5F5F5;
+border: 1px solid #E3E3E3;
+        border-radius: 4px;
+
+        box-shadow: 0 1px 1px rgba(0, 0, 0, 0.05) inset;
+        margin-bottom: 20px;
+        min-height: 20px;
+padding: 10px;
+}
+
+.dc-grid-item {
+float:left;
+margin:0 10px 10px 0;
+padding:5px;
+width:200px;
+height:280px;
+background-color: #F8F8F8;
+border-color: #E7E7E7;
+border-radius: 4px;
+text-align:center;
+box-shadow: 0 1px 1px rgba(0, 0, 0, 0.05) inset;
+}
+.dc-grid-item img {width:auto;height:auto}
+.dc-grid-top h1 {font-size:22px;}
+.dc-grid-top h2 {font-size:14px;}
+</style>
+</div>
+
+
+</div>
+</div>
+
+</body>
+</html>
