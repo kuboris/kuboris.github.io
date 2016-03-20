@@ -148,7 +148,7 @@ function grid (selector,data) {
             return [
                 p.key,
                 'Upvotes: ' + p.value.absGain,
-                '# of links: ' + p.value.count
+                '# of links: ' + p.value.percentageGain
             ].join('\n');
         })
 		.yAxis().tickFormat(function (v) {
